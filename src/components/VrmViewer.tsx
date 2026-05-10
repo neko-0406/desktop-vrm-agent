@@ -1,4 +1,4 @@
-import { VRMLoaderPlugin, VRMUtils, VRM, MToonMaterialLoaderPlugin, MToonMaterial } from "@pixiv/three-vrm";
+import { VRMLoaderPlugin, VRMUtils, VRM, MToonMaterialLoaderPlugin } from "@pixiv/three-vrm";
 import { useEffect, useRef } from "react";
 import { GLTFLoader, OrbitControls } from "three/examples/jsm/Addons.js";
 
