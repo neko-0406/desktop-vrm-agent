@@ -1,33 +1,38 @@
 import { VRMLoaderPlugin, VRMUtils, VRM, MToonMaterialLoaderPlugin } from "@pixiv/three-vrm";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { GLTFLoader, OrbitControls } from "three/examples/jsm/Addons.js";
 
-import * as THREE from "three";
+import * as THREE from "three/webgpu";
 import { MToonNodeMaterial } from "@pixiv/three-vrm/nodes";
+import { VRMAnimationLoaderPlugin, VRMAnimation, createVRMAnimationClip } from "@pixiv/three-vrm-animation";
 
 export interface VrmViewerProps {
   vrmUrl: string | null;
+  vrmaUrl: string | null;
   width?: string;
   height?: string;
 }
 
-export function VrmViewer({ vrmUrl, width = "100%", height = "100%" }: VrmViewerProps) {
+export function VrmViewer({ vrmUrl, vrmaUrl, width = "100%", height = "100%" }: VrmViewerProps) {
+  // モデルロードを検知するstate
+  const [loadedVrm, setLoadedVrm] = useState<VRM | null>(null);
   // コンポーネントで扱うインスタンス管理
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const lightRef = useRef<THREE.DirectionalLight | null>(null);
-  const vrmRef = useRef<VRM | null>(null);
   const loaderRef = useRef<GLTFLoader | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const mixerRef = useRef<THREE.AnimationMixer | null>(null);
+  const vrmRef = useRef<VRM | null>(null);
 
-  // 各インスタンスの初期化
+  // 各インスタンスの初期化・カメラ・ライト・アニメーションの
   useEffect(() => {
     const container = containerRef.current;
     if (container == null) return;
 
     // レンダラー
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    const renderer = new THREE.WebGPURenderer({ antialias: true, alpha: true });
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
     container.appendChild(renderer.domElement);
@@ -56,12 +61,16 @@ export function VrmViewer({ vrmUrl, width = "100%", height = "100%" }: VrmViewer
     lightRef.current = light;
 
     // アニメーションループ
-    const timer = new THREE.Timer();
+    const timer = new THREE.Clock();
     renderer.setAnimationLoop(() => {
       const delta = timer.getDelta();
 
       if (vrmRef.current) {
         vrmRef.current.update(delta);
+      }
+
+      if (mixerRef.current) {
+        mixerRef.current.update(delta);
       }
 
       if (sceneRef.current && cameraRef.current) {
@@ -78,7 +87,6 @@ export function VrmViewer({ vrmUrl, width = "100%", height = "100%" }: VrmViewer
       cameraRef.current.aspect = width / height;
       cameraRef.current.updateProjectionMatrix();
     };
-
     window.addEventListener("resize", handleResize);
 
     setTimeout(handleResize, 100);
@@ -104,6 +112,44 @@ export function VrmViewer({ vrmUrl, width = "100%", height = "100%" }: VrmViewer
       }
     };
   }, []);
+
+  // アニメーションの読み込み(vrmUrl, vrmaUrl更新時)
+  useEffect(() => {
+    if (!vrmaUrl || !loadedVrm) return;
+
+    // アニメーション用のローダー作成
+    const animLoader = new GLTFLoader();
+    animLoader.crossOrigin = "anonymous";
+    animLoader.register((parser) => new VRMAnimationLoaderPlugin(parser));
+
+    animLoader.load(
+      vrmaUrl,
+      (gltf) => {
+        // プラグインによって解析されたVRMAnimationデータを取り出す
+        const vrmAnimations = gltf.userData.vrmAnimations as VRMAnimation[];
+        if (!vrmAnimations || vrmAnimations.length === 0) return;
+
+        const vrmAnimation = vrmAnimations[0];
+
+        // 今いるVRMモデルのアニメーションクリップを生成
+        const clip = createVRMAnimationClip(vrmAnimation, loadedVrm);
+        // 再生機（Mixer）を初期化し、VRMモデルに紐付け
+        const mixer = new THREE.AnimationMixer(loadedVrm.scene);
+        mixerRef.current = mixer;
+        // クリップを再生キューに入れてスタート
+        mixer.clipAction(clip).play();
+        console.log("Animation Loaded & Played!");
+      },
+      undefined,
+      (error) => console.error("Animation Load Error:", error),
+    );
+    return () => {
+      if (mixerRef.current) {
+        mixerRef.current.stopAllAction();
+        mixerRef.current = null;
+      }
+    };
+  }, [vrmaUrl, loadedVrm]);
 
   // vrmUrlが変更->読み込むアバターを変更するごとに更新
   useEffect(() => {
@@ -137,6 +183,7 @@ export function VrmViewer({ vrmUrl, width = "100%", height = "100%" }: VrmViewer
 
         VRMUtils.rotateVRM0(vrm);
         console.log("VRM model loaded successfully:", vrm);
+        setLoadedVrm(vrm);
       },
       (progress) => console.log("loading model...", (progress.loaded / (progress.total || 1)) * 100, "%"),
       (error: any) => console.error("Error loading VRM:", error),
@@ -147,6 +194,7 @@ export function VrmViewer({ vrmUrl, width = "100%", height = "100%" }: VrmViewer
         sceneRef.current?.remove(vrmRef.current.scene);
         VRMUtils.deepDispose(vrmRef.current.scene);
         vrmRef.current = null;
+        setLoadedVrm(null);
       }
     };
   }, [vrmUrl]);
