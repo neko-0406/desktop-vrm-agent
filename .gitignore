@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# テスト用データ
+avatar.vrm
+avatar.vrma
