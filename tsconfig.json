@@ -5,10 +5,6 @@
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "skipLibCheck": true,
-    "paths": {
-      "three/webgpu": ["./node_modules/three/build/three.webgpu.js"],
-      "three/tsl": ["./node_modules/three/build/three.tsl.js"],
-    },
 
     /* Bundler mode */
     "moduleResolution": "bundler",
