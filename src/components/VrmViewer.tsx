@@ -2,7 +2,7 @@ import { VRMLoaderPlugin, VRMUtils, VRM, MToonMaterialLoaderPlugin } from "@pixi
 import { useEffect, useRef } from "react";
 import { GLTFLoader, OrbitControls } from "three/examples/jsm/Addons.js";
 
-import * as THREE from "three";
+import * as THREE from "three/webgpu";
 import { MToonNodeMaterial } from "@pixiv/three-vrm/nodes";
 
 export interface VrmViewerProps {
@@ -27,7 +27,7 @@ export function VrmViewer({ vrmUrl, width = "100%", height = "100%" }: VrmViewer
     if (container == null) return;
 
     // レンダラー
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    const renderer = new THREE.WebGPURenderer({ antialias: true, alpha: true });
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
     container.appendChild(renderer.domElement);
